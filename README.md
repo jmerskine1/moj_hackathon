@@ -1,12 +1,4 @@
-# An Empirical Survey of the Effectiveness of Debiasing Techniques for Pre-trained Language Models
-> Nicholas Meade, Elinor Poole-Dayan, Siva Reddy
 
-[![arxiv](https://img.shields.io/badge/arXiv-2110.00768-b31b1b.svg)](https://arxiv.org/abs/2110.08527)
-
-This repository contains the official source code for [An Empirical Survey of the Effectiveness of Debiasing Techniques for Pre-trained Language Models](https://arxiv.org/abs/2110.08527) presented at ACL 2022.
-
-## Bias Bench Leaderboard
-For tracking progress on the intrinsic bias benchmarks evaluated in this work, we created [**Bias Bench**](https://mcgill-nlp.github.io/bias-bench/). We plan to update Bias Bench in the future with additional bias benchmarks. To make a submission to Bias Bench, please contact nicholas.meade@mila.quebec.
 
 ## Install
 ```bash
@@ -48,7 +40,31 @@ The commands used in `batch_jobs` produce the results presented in the paper.
 ### Notes
 * To run SentenceDebias models against any of the benchmarks, you will first need to run `experiments/sentence_debias_subspace.py`.
 * To run INLP models against any of the benchmarks, you will first need to run `experiments/inlp_projection_matrix.py`.
-* `export` contains a collection of scripts to format the results into the tables presented in the paper.
+* `export` contains a collection of scripts to format the results into the tables presented in the [paper](https://arxiv.org/abs/2110.08527).
+
+* To help get you started you can run the following to test:
+#### Stereoset
+ the default model (`bert base cased`)
+```bash
+python experiments/stereoset.py
+```
+or e.g. for gpt2
+```bash
+python experiments/stereoset.py --model "GPT2LMHeadModel" --model_name_or_path "gpt2"
+```
+#### CrowS-Pairs
+* You can get the evaluations for your models tested on Stereoset by running 
+```bash
+python experiments/stereoset_evaluation.py --predictions_dir "results/stereoset"
+```
+
+* I've created a rudimentary example results plotter to help demonstrate how to access model outputs, which can be called with 
+
+```bash
+python plot_results.py "results/stereoset/stereoset_m-BertForMaskedLM_c-bert-base-uncased.json" "results/stereoset/stereoset_m-GPT2LMHeadModel_c-gpt2.json" --output 'outputs/fig.png'
+```
+
+
 
 ## Running on an HPC Cluster
 We provide scripts for running all of the experiments presented in the paper on a SLURM cluster in `batch_jobs`.
@@ -56,30 +72,4 @@ If you plan to use these scripts, make sure you customize `python_job.sh` to run
 In addition, you will also need to change both the output (`-o`) and error (`-e`) paths.
 
 ## Acknowledgements
-This repository makes use of code from the following repositories:
-
-* [Towards Debiasing Sentence Representations](https://github.com/pliang279/sent_debias)
-* [StereoSet: Measuring Stereotypical Bias in Pre-trained Language Models](https://github.com/moinnadeem/stereoset)
-* [CrowS-Pairs: A Challenge Dataset for Measuring Social Biases in Masked Language Models](https://github.com/nyu-mll/crows-pairs)
-* [On Measuring Social Biases in Sentence Encoders](https://github.com/w4ngatang/sent-bias)
-* [Null It Out: Guarding Protected Attributes by Iterative Nullspace Projection](https://github.com/shauli-ravfogel/nullspace_projection)
-* [Towards Understanding and Mitigating Social Biases in Language Models](https://github.com/pliang279/lm_bias)
-* [Self-Diagnosis and Self-Debiasing: A Proposal for Reducing Corpus-Based Bias in NLP](https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00434/108865/Self-Diagnosis-and-Self-Debiasing-A-Proposal-for)
-
-We thank the authors for making their code publicly available.
-
-## Citation
-If you use the code in this repository, please cite the following paper:
-
-    @inproceedings{meade_2022_empirical,
-        title = "An Empirical Survey of the Effectiveness of Debiasing Techniques for Pre-trained Language Models",
-        author = "Meade, Nicholas  and Poole-Dayan, Elinor  and Reddy, Siva",
-        booktitle = "Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
-        month = may,
-        year = "2022",
-        address = "Dublin, Ireland",
-        publisher = "Association for Computational Linguistics",
-        url = "https://aclanthology.org/2022.acl-long.132",
-        doi = "10.18653/v1/2022.acl-long.132",
-        pages = "1878--1898",
-    }
+This repository is a slightly modified version of the [bias-bench](https://github.com/McGill-NLP/bias-bench). For more info see [An Empirical Survey of the Effectiveness of Debiasing Techniques for Pre-trained Language Models](https://arxiv.org/abs/2110.08527) presented at ACL 2022.

@@ -103,7 +103,7 @@ class CrowSPairsRunner:
             for index, data in df_data.iterrows():
                 direction = data["direction"]
                 bias = data["bias_type"]
-
+                
                 assert bias == self._bias_type
 
                 sent1, sent2 = data["sent1"], data["sent2"]
@@ -159,18 +159,18 @@ class CrowSPairsRunner:
                     sent_more_score = score2
                     sent_less_score = score1
 
-                df_score = df_score.append(
-                    {
-                        "sent_more": sent_more,
-                        "sent_less": sent_less,
-                        "sent_more_score": sent_more_score,
-                        "sent_less_score": sent_less_score,
-                        "score": pair_score,
-                        "stereo_antistereo": direction,
-                        "bias_type": bias,
-                    },
-                    ignore_index=True,
-                )
+                df_score = pd.concat([df_score,
+                    pd.DataFrame(
+                        {
+                            "sent_more": [sent_more],
+                            "sent_less": [sent_less],
+                            "sent_more_score": [sent_more_score],
+                            "sent_less_score": [sent_less_score],
+                            "score": [pair_score],
+                            "stereo_antistereo": [direction],
+                            "bias_type": [bias],
+                        })],
+                    ignore_index=True)
 
         print("=" * 100)
         print("Total examples:", N)
@@ -258,19 +258,20 @@ class CrowSPairsRunner:
                     sent_less = data["sent1"]
                     sent_more_score = score2
                     sent_less_score = score1
-
-                df_score = df_score.append(
-                    {
-                        "sent_more": sent_more,
-                        "sent_less": sent_less,
-                        "sent_more_score": sent_more_score,
-                        "sent_less_score": sent_less_score,
-                        "score": pair_score,
-                        "stereo_antistereo": direction,
-                        "bias_type": bias,
-                    },
-                    ignore_index=True,
-                )
+                
+                df_score = pd.concat([df_score,
+                    pd.DataFrame(
+                        {
+                            "sent_more": [sent_more],
+                            "sent_less": [sent_less],
+                            "sent_more_score": [sent_more_score],
+                            "sent_less_score": [sent_less_score],
+                            "score": [pair_score],
+                            "stereo_antistereo": [direction],
+                            "bias_type": [bias],
+                        })],
+                    ignore_index=True)
+                
 
         print("=" * 100)
         print("Total examples:", N)
@@ -416,9 +417,212 @@ class CrowSPairsRunner:
                     "direction": direction,
                     "bias_type": bias_type,
                 }
-                df_data = df_data.append(df_item, ignore_index=True)
+                # df_data = df_data.append(df_item, ignore_index=True)
+                df_data = pd.concat([df_data, pd.DataFrame([df_item])], ignore_index=True)
+
 
         return df_data
+
+
+
+class CrowSPairsClassifyRunner:
+    """Runs the CrowS-Pairs benchmark.
+
+    Notes:
+        * We use our likelihood scoring as opposed to the pseudo-likelihood
+          scoring used by Nangia et al.
+    """
+
+    def __init__(
+        self,
+        model,
+        tokenizer,
+        input_file,
+        
+    ):
+        """Initializes CrowS-Pairs benchmark runner.
+
+        Args:
+            model: HuggingFace model (e.g., BertForMaskedLM) to evaluate.
+            tokenizer: HuggingFace tokenizer to use for preparing the CrowS-Pairs
+                examples.
+            input_file (`str`): Path to the file containing the annotated CrowS-Pairs
+                dataset.
+        """
+        self._model = model
+        self._tokenizer = tokenizer
+        self._input_file = input_file
+        
+        # CrowS-Pairs labels race examples with "race-color".
+        
+
+    def __call__(self):
+        
+        return self._classify()
+
+    
+
+    def _classify(self):
+        """Evaluates CrowS-Pairs examples using cosine similarity to bias terms."""
+        df_data = self._read_data(self._input_file)
+        self.bias_terms = set(df_data["bias_type"])
+        self.bias_terms.remove('physical-appearance')
+        self.bias_terms.remove('sexual-orientation')
+        self.bias_terms = [term.replace("-"," ") for term in self.bias_terms]
+        self.bias_terms = [term.replace(" color","") for term in self.bias_terms]
+        # Precompute embeddings
+        
+        bias_embeddings = {
+            
+            term: self.get_embedding(self._tokenizer.encode(term, return_tensors="pt").to(device)) for term in self.bias_terms
+        }
+
+        self._model.to(device)
+        rows = []
+
+        
+
+
+        df_score = pd.DataFrame(
+            columns=[
+                "pred",
+                "label",
+                "sent",
+            ]
+        )
+        df_data = df_data[df_data["bias_type"]!='physical-appearance']
+        total = len(df_data)
+        df_small = df_data.iloc[0:100]
+
+        with tqdm(total=total) as pbar:
+            
+            for index, data in df_small.iterrows():
+            # for index, data in df_small.iterrows():
+                
+                bias_type = data["bias_type"]
+                sent1, sent2 = data["sent1"], data["sent2"]
+
+                try:
+                    sent1_token_ids = self._tokenizer.encode(sent1, return_tensors="pt").to(device)
+                    sent1_embeddings = self.get_embedding(sent1_token_ids)
+                    sent2_token_ids = self._tokenizer.encode(sent2, return_tensors="pt").to(device)
+                    sent2_embeddings = self.get_embedding(sent2_token_ids)
+                except Exception as e:
+                    print(f"Skipping example {index} due to tokenization error: {e}")
+                    continue
+                
+                pred = None
+                sent_id=None
+                max_score=0
+
+                for bias,emb in bias_embeddings.items():
+                    
+                    # Get cosine similarity between sentence and bias term
+                    score1 = round(self._compute_cos_sim(sent1_embeddings, emb), 3)
+                    score2 = round(self._compute_cos_sim(sent2_embeddings, emb), 3)
+
+                    
+                    
+                    if score1 > score2:
+                        sent_id = 1
+                    elif score2 > score1:
+                        sent_id=2
+                    elif score2 == score1:
+                        sent_id=0
+                    
+                    if max_score < score1 and max_score < score2:
+                        max_score = np.max([score1,score2])
+                        pred = bias
+                        # print(bias)
+                        
+                pbar.update(1)
+                
+                # Inside your loop:
+                rows.append({
+                    "pred": pred,
+                    "label": bias_type,
+                    "sent": str(sent_id),
+                })
+              
+                
+                # df_score = pd.concat([df_score, new_row], ignore_index=True)
+        # After the loop:
+        df_score = pd.DataFrame(rows)
+        print(df_score)
+        accuracy = np.sum([df_score['pred'].values==df_score['label'].values])
+        sent_list = list(df_score['sent'].values)
+        stereo_ratio = round(sent_list.count('1')/len(sent_list) * 100,2)
+
+        print("=" * 100)
+        print('accuracy: ',accuracy)
+        print("Total examples:", total)
+
+        print("Metric score:", stereo_ratio)
+        print("=" * 100)
+        print()
+
+        return {'accuracy': str(accuracy),
+                'stereo_ratio': str(stereo_ratio)}
+
+
+    def get_embedding(self, input_ids):
+        with torch.no_grad():
+            outputs = self._model(input_ids, output_hidden_states=True)
+            hidden_states = outputs.hidden_states  # tuple of layers
+
+            # Take the last layer hidden state: (batch_size, seq_len, hidden_dim)
+            last_hidden = hidden_states[-1]
+
+            # Pool embeddings: mean pooling over sequence length
+            embedding = last_hidden.mean(dim=1)  # (batch_size, hidden_dim)
+        return embedding
+
+    def _compute_cos_sim(self, emb1, emb2):
+        # cosine similarity between input and term embeddings
+        similarity = F.cosine_similarity(emb1, emb2).item()
+            
+        return similarity
+
+
+
+
+
+    def _read_data(self, input_file):
+        """Load data into pandas DataFrame format."""
+
+        df_data = pd.DataFrame(columns=["sent1", "sent2", "direction", "bias_type"])
+
+        
+
+        with open(input_file) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                direction, gold_bias = "_", "_"
+                direction = row["stereo_antistereo"]
+                bias_type = row["bias_type"]
+
+                
+
+                sent1, sent2 = "", ""
+                if direction == "stereo":
+                    sent1 = row["sent_more"]
+                    sent2 = row["sent_less"]
+                else:
+                    sent1 = row["sent_less"]
+                    sent2 = row["sent_more"]
+
+                df_item = {
+                    "sent1": sent1,
+                    "sent2": sent2,
+                    "direction": direction,
+                    "bias_type": bias_type,
+                }
+                # df_data = df_data.append(df_item, ignore_index=True)
+                df_data = pd.concat([df_data, pd.DataFrame([df_item])], ignore_index=True)
+
+
+        return df_data
+
 
 
 def _get_span(seq1, seq2, operation):

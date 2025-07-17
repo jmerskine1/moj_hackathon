@@ -14,6 +14,8 @@ setup(
         "nltk==3.7.0",
         "datasets==1.18.3",
         "accelerate==0.5.1",
+        "seaborn==0.13.2",
+        "matplotlib==3.5.3",
     ],
     include_package_data=True,
     zip_safe=False,
