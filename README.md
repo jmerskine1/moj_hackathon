@@ -53,11 +53,26 @@ or e.g. for gpt2
 ```bash
 python experiments/stereoset.py --model "GPT2LMHeadModel" --model_name_or_path "gpt2"
 ```
-#### CrowS-Pairs
+
 * You can get the evaluations for your models tested on Stereoset by running 
 ```bash
 python experiments/stereoset_evaluation.py --predictions_dir "results/stereoset"
 ```
+
+#### CrowS-Pairs
+
+you can now filter on bias terms and add your own search terms - but we have no labels so the classification accuracy will be zero - but you can experiment with different types of bias. for example, compare 
+
+```bash
+python experiments/crows_classifier.py --model "GPT2LMHeadModel" --model_name_or_path "gpt2" --bias_terms race-color --search_terms domestic-violence
+```
+and 
+
+```bash
+python experiments/crows_classifier.py --model "GPT2LMHeadModel" --model_name_or_path "gpt2" --bias_terms gender --search_terms domestic-violence
+```
+to compare how biased the model is when ranking for "domestic violence"
+
 
 * I've created a rudimentary example results plotter to help demonstrate how to access model outputs, which can be called with 
 
