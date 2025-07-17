@@ -438,6 +438,8 @@ class CrowSPairsClassifyRunner:
         model,
         tokenizer,
         input_file,
+        bias_terms = None,
+        search_terms = None,
         
     ):
         """Initializes CrowS-Pairs benchmark runner.
@@ -452,7 +454,8 @@ class CrowSPairsClassifyRunner:
         self._model = model
         self._tokenizer = tokenizer
         self._input_file = input_file
-        
+        self.bias_terms = bias_terms
+        self.search_terms = search_terms
         # CrowS-Pairs labels race examples with "race-color".
         
 
@@ -465,16 +468,19 @@ class CrowSPairsClassifyRunner:
     def _classify(self):
         """Evaluates CrowS-Pairs examples using cosine similarity to bias terms."""
         df_data = self._read_data(self._input_file)
-        self.bias_terms = set(df_data["bias_type"])
-        self.bias_terms.remove('physical-appearance')
-        self.bias_terms.remove('sexual-orientation')
-        self.bias_terms = [term.replace("-"," ") for term in self.bias_terms]
-        self.bias_terms = [term.replace(" color","") for term in self.bias_terms]
+        if self.bias_terms == None:
+            self.bias_terms = set(df_data["bias_type"])
+            
+            self.bias_terms = [term.replace("-"," ") for term in self.bias_terms]
+            self.bias_terms = [term.replace(" color","") for term in self.bias_terms]
+
+        if self.search_terms == None:
+            self.search_terms = self.bias_terms
         # Precompute embeddings
         
-        bias_embeddings = {
+        search_embeddings = {
             
-            term: self.get_embedding(self._tokenizer.encode(term, return_tensors="pt").to(device)) for term in self.bias_terms
+            term: self.get_embedding(self._tokenizer.encode(term, return_tensors="pt").to(device)) for term in self.search_terms
         }
 
         self._model.to(device)
@@ -490,13 +496,16 @@ class CrowSPairsClassifyRunner:
                 "sent",
             ]
         )
-        df_data = df_data[df_data["bias_type"]!='physical-appearance']
+        # df_data = df_data[df_data["bias_type"]!='physical-appearance']
+        
+        df_data = df_data[df_data["bias_type"].isin(self.bias_terms)]
+
         total = len(df_data)
         df_small = df_data.iloc[0:100]
 
         with tqdm(total=total) as pbar:
             
-            for index, data in df_small.iterrows():
+            for index, data in df_data.iterrows():
             # for index, data in df_small.iterrows():
                 
                 bias_type = data["bias_type"]
@@ -515,7 +524,7 @@ class CrowSPairsClassifyRunner:
                 sent_id=None
                 max_score=0
 
-                for bias,emb in bias_embeddings.items():
+                for search,emb in search_embeddings.items():
                     
                     # Get cosine similarity between sentence and bias term
                     score1 = round(self._compute_cos_sim(sent1_embeddings, emb), 3)
@@ -532,7 +541,7 @@ class CrowSPairsClassifyRunner:
                     
                     if max_score < score1 and max_score < score2:
                         max_score = np.max([score1,score2])
-                        pred = bias
+                        pred = search
                         # print(bias)
                         
                 pbar.update(1)
@@ -548,8 +557,8 @@ class CrowSPairsClassifyRunner:
                 # df_score = pd.concat([df_score, new_row], ignore_index=True)
         # After the loop:
         df_score = pd.DataFrame(rows)
-        print(df_score)
-        accuracy = np.sum([df_score['pred'].values==df_score['label'].values])
+        # print(df_score)
+        accuracy = np.sum([df_score['pred'].values==df_score['label'].values])/total *100
         sent_list = list(df_score['sent'].values)
         stereo_ratio = round(sent_list.count('1')/len(sent_list) * 100,2)
 

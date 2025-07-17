@@ -40,6 +40,20 @@ parser.add_argument(
     "model is instantiated.",
 )
 
+parser.add_argument(
+    "--bias_terms",
+    nargs="+",  # Accept one or more terms as a list
+    default=None,
+    choices=["gender", "race-color", "religion", "physical-appearance"],  # Add any others as needed
+    help="List of CrowS-Pairs bias types to evaluate against. Example: --bias_terms gender race",
+)
+
+parser.add_argument(
+    "--search_terms",
+    nargs="+",  # allows multiple arguments
+    default=None,
+    help="List of bias types to evaluate against. Use quotes for multi-word terms.",
+)
 
 
 if __name__ == "__main__":
@@ -55,6 +69,8 @@ if __name__ == "__main__":
     print(f" - persistent_dir: {args.persistent_dir}")
     print(f" - model: {args.model}")
     print(f" - model_name_or_path: {args.model_name_or_path}")
+
+
     
 
     # Load model and tokenizer.
@@ -66,6 +82,8 @@ if __name__ == "__main__":
         model=model,
         tokenizer=tokenizer,
         input_file=f"{args.persistent_dir}/data/crows/crows_pairs_anonymized.csv",
+        search_terms = args.search_terms,
+        bias_terms=args.bias_terms
         
     )
     results = runner()
