@@ -2,7 +2,7 @@
 
 ## Install
 ```bash
-git clone git remote set-url origin https://github.com/jmerskine1/moj_hackathon.git
+git clone https://github.com/jmerskine1/moj_hackathon.git
 
 cd bias-bench 
 python -m pip install -e .
